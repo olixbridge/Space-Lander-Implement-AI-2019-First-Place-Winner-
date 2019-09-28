@@ -1,19 +1,26 @@
-import gym
 from tqdm import tqdm
 from stable_baselines import DQN
+from space_lander.envs.lunar_lander import *
+from space_lander.envs.spacex_lander import *
 
 # Create environment
-env = gym.make('LunarLander-v2')
-# Instantiate the agent
-model = DQN('MlpPolicy', env, learning_rate=1e-3, prioritized_replay=True, verbose=1, tensorboard_log="./lunar_lander_dqn")
-# Train the agent
-model.learn(total_timesteps=int(2e4), log_interval=10)
-# Save the agent
-model.save("dqn_lunar")
-del model  # delete trained model to demonstrate loading
+env_names = ['SpaceXLander-v0', 'LunarLanderv2-v0']
+env_name = env_names[0]
+env = gym.make(env_name)
 
-# Load the trained agent
-model = DQN.load("dqn_lunar")
+# Instantiate the agent
+model = DQN(policy='MlpPolicy',
+            env=env,
+            learning_rate=1e-3,
+            prioritized_replay=True,
+            verbose=1,
+            tensorboard_log=f"./{env_name}")
+
+# Train the agent
+model.learn(total_timesteps=int(2e2), log_interval=10)
+
+# Save the agent
+model.save(env_name)
 
 # Enjoy trained agent
 obs = env.reset()
