@@ -41,7 +41,7 @@ class LunarLanderv1(LunarLander):
         self.viewer = None
         
         self.world = Box2D.b2World(Box2D.b2Vec2(0, -1.6))
-        self.moon = None
+        self.moon = Box2D.b2World(Box2D.b2Vec2(0, -0.016))
         self.lander = None
         self.particles = []
         
