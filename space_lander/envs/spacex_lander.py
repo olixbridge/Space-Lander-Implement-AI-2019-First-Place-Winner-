@@ -247,7 +247,9 @@ class SpaceXLander(LunarLander):
         self.world.Step(1.0/FPS, 6*30, 2*30)
 
         #Wind
-        self.lander.ApplyForceToCenter((-50, 0), True)
+        #np.random.seed(a=None, version=2)
+        self.lander.ApplyForceToCenter((np.random.randint(-50,50), 0), True)
+        
 
         #Air resistance
         p = 1.225 #kg/m^3
