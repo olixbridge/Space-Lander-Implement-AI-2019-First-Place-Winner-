@@ -1,4 +1,0 @@
-mpi4py
-gym
-stable-baselines
-box2d-py
