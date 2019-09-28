@@ -1,12 +1,12 @@
-# from gym.envs.box2d.lunar_lander import VIEWPORT_W, VIEWPORT_H, SCALE, LunarLander, EzPickle, Box2D, spaces, ContactDetector, edgeShape
+import math
 
 import Box2D
 import gym
 import numpy as np
-from Box2D.b2 import (edgeShape, fixtureDef, polygonShape, revoluteJointDef)
+from Box2D.b2 import (fixtureDef, polygonShape, revoluteJointDef, circleShape, edgeShape)
 from gym import spaces
 from gym.envs.box2d import LunarLander
-from gym.envs.box2d.lunar_lander import ContactDetector
+from gym.envs.box2d.lunar_lander import VIEWPORT_W, VIEWPORT_H, SCALE, ContactDetector
 from gym.utils import EzPickle
 
 FPS = 50
@@ -15,30 +15,22 @@ SCALE = 30.0  # affects how fast-paced the game is, forces should be adjusted as
 MAIN_ENGINE_POWER = 13.0
 SIDE_ENGINE_POWER = 0.6
 
-VIEWPORT_W = 1200
-VIEWPORT_H = 600
-
 INITIAL_RANDOM = 1000.0  # Set 1500 to make game harder
 
 LANDER_POLY = [
-    (-10, -10), (-10, 50), (10, 50), (0, 60), (10, -10)
+    (-14, +17), (-17, 0), (-17, -10),
+    (+17, -10), (+17, 0), (+14, +17)
 ]
-
-PLATFORM_WIDTH = 120
-PLATFORM_HEIGHT = 10
-PLATFORM_POLY = [
-    (-PLATFORM_WIDTH / 2, PLATFORM_HEIGHT / 2),
-    (PLATFORM_WIDTH / 2, PLATFORM_HEIGHT / 2),
-    (PLATFORM_WIDTH / 2, -PLATFORM_HEIGHT / 2),
-    (-PLATFORM_WIDTH / 2, -PLATFORM_HEIGHT / 2)]
-
-LEG_AWAY = 12
+LEG_AWAY = 20
 LEG_DOWN = 18
-LEG_W, LEG_H = 3, 8
+LEG_W, LEG_H = 2, 8
 LEG_SPRING_TORQUE = 40
 
-SIDE_ENGINE_HEIGHT = 32.0
+SIDE_ENGINE_HEIGHT = 14.0
 SIDE_ENGINE_AWAY = 12.0
+
+VIEWPORT_W = 1200
+VIEWPORT_H = 600
 
 
 class LunarLanderv1(LunarLander):
@@ -168,6 +160,156 @@ class LunarLanderv1(LunarLander):
         self.drawlist = [self.lander] + self.legs
         
         return self.step(np.array([0, 0]) if self.continuous else 0)[0]
+    
+    def step(self, action):
+        if self.continuous:
+            action = np.clip(action, -1, +1).astype(np.float32)
+        else:
+            assert self.action_space.contains(action), "%r (%s) invalid " % (
+                action, type(action))
+        
+        # Engines
+        tip = (math.sin(self.lander.angle), math.cos(self.lander.angle))
+        side = (-tip[1], tip[0]);
+        dispersion = [self.np_random.uniform(-1.0, +1.0) / SCALE for _ in
+                      range(2)]
+        
+        m_power = 0.0
+        if (self.continuous and action[0] > 0.0) or (
+            not self.continuous and action == 2):
+            # Main engine
+            if self.continuous:
+                m_power = (np.clip(action[0], 0.0, 1.0) + 1.0) * 0.5  # 0.5..1.0
+                assert m_power >= 0.5 and m_power <= 1.0
+            else:
+                m_power = 1.0
+            ox = tip[0] * (4 / SCALE + 2 * dispersion[0]) + side[0] *\
+                 dispersion[1]  # 4 is move a bit downwards, +-2 for randomness
+            oy = -tip[1] * (4 / SCALE + 2 * dispersion[0]) - side[1] *\
+                 dispersion[1]
+            impulse_pos = (
+                self.lander.position[0] + ox, self.lander.position[1] + oy)
+            p = self._create_particle(3.5, impulse_pos[0], impulse_pos[1],
+                                      m_power)  # particles are just a decoration, 3.5 is here to make particle speed adequate
+            p.ApplyLinearImpulse((ox * MAIN_ENGINE_POWER * m_power,
+                                  oy * MAIN_ENGINE_POWER * m_power),
+                                 impulse_pos, True)
+            self.lander.ApplyLinearImpulse((-ox * MAIN_ENGINE_POWER * m_power,
+                                            -oy * MAIN_ENGINE_POWER * m_power),
+                                           impulse_pos, True)
+        
+        s_power = 0.0
+        if (self.continuous and np.abs(action[1]) > 0.5) or (
+            not self.continuous and action in [1, 3]):
+            # Orientation engines
+            if self.continuous:
+                direction = np.sign(action[1])
+                s_power = np.clip(np.abs(action[1]), 0.5, 1.0)
+                assert s_power >= 0.5 and s_power <= 1.0
+            else:
+                direction = action - 2
+                s_power = 1.0
+            ox = tip[0] * dispersion[0] + side[0] * (
+                3 * dispersion[1] + direction * SIDE_ENGINE_AWAY / SCALE)
+            oy = -tip[1] * dispersion[0] - side[1] * (
+                3 * dispersion[1] + direction * SIDE_ENGINE_AWAY / SCALE)
+            impulse_pos = (self.lander.position[0] + ox - tip[0] * 17 / SCALE,
+                           self.lander.position[1] + oy + tip[
+                               1] * SIDE_ENGINE_HEIGHT / SCALE)
+            p = self._create_particle(0.7, impulse_pos[0], impulse_pos[1],
+                                      s_power)
+            p.ApplyLinearImpulse((ox * SIDE_ENGINE_POWER * s_power,
+                                  oy * SIDE_ENGINE_POWER * s_power),
+                                 impulse_pos, True)
+            self.lander.ApplyLinearImpulse((-ox * SIDE_ENGINE_POWER * s_power,
+                                            -oy * SIDE_ENGINE_POWER * s_power),
+                                           impulse_pos, True)
+        
+        self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
+        
+        pos = self.lander.position
+        vel = self.lander.linearVelocity
+        state = [
+            (pos.x - VIEWPORT_W / SCALE / 2) / (VIEWPORT_W / SCALE / 2),
+            (pos.y - (self.helipad_y + LEG_DOWN / SCALE)) / (
+                VIEWPORT_H / SCALE / 2),
+            vel.x * (VIEWPORT_W / SCALE / 2) / FPS,
+            vel.y * (VIEWPORT_H / SCALE / 2) / FPS,
+            self.lander.angle,
+            20.0 * self.lander.angularVelocity / FPS,
+            1.0 if self.legs[0].ground_contact else 0.0,
+            1.0 if self.legs[1].ground_contact else 0.0
+        ]
+        assert len(state) == 8
+        
+        reward = 0
+        shaping =\
+            - 100 * np.sqrt(state[0] * state[0] + state[1] * state[1])\
+            - 100 * np.sqrt(state[2] * state[2] + state[3] * state[3])\
+            - 100 * abs(state[4]) + 10 * state[6] + 10 * state[
+                7]  # And ten points for legs contact, the idea is if you
+        # lose contact again after landing, you get negative reward
+        if self.prev_shaping is not None:
+            reward = shaping - self.prev_shaping
+        self.prev_shaping = shaping
+        
+        reward -= m_power * 0.30  # less fuel spent is better, about -30 for heurisic landing
+        reward -= s_power * 0.03
+        
+        done = False
+        if self.game_over or abs(state[0]) >= 1.0:
+            done = True
+            reward = -100
+        if not self.lander.awake:
+            done = True
+            reward = +100
+        return np.array(state, dtype=np.float32), reward, done, {}
+    
+    def render(self, mode='human'):
+        from gym.envs.classic_control import rendering
+        if self.viewer is None:
+            self.viewer = rendering.Viewer(VIEWPORT_W, VIEWPORT_H)
+            self.viewer.set_bounds(0, VIEWPORT_W / SCALE, 0, VIEWPORT_H / SCALE)
+        
+        for obj in self.particles:
+            obj.ttl -= 0.15
+            obj.color1 = (max(0.2, 0.2 + obj.ttl), max(0.2, 0.5 * obj.ttl),
+                          max(0.2, 0.5 * obj.ttl))
+            obj.color2 = (max(0.2, 0.2 + obj.ttl), max(0.2, 0.5 * obj.ttl),
+                          max(0.2, 0.5 * obj.ttl))
+        
+        self._clean_particles(False)
+        
+        for p in self.sky_polys:
+            self.viewer.draw_polygon(p, color=(0, 0, 0))
+        
+        for obj in self.particles + self.drawlist:
+            for f in obj.fixtures:
+                trans = f.body.transform
+                if type(f.shape) is circleShape:
+                    t = rendering.Transform(translation=trans * f.shape.pos)
+                    self.viewer.draw_circle(f.shape.radius, 20,
+                                            color=obj.color1).add_attr(t)
+                    self.viewer.draw_circle(f.shape.radius, 20,
+                                            color=obj.color2, filled=False,
+                                            linewidth=2).add_attr(t)
+                else:
+                    path = [trans * v for v in f.shape.vertices]
+                    self.viewer.draw_polygon(path, color=obj.color1)
+                    path.append(path[0])
+                    self.viewer.draw_polyline(path, color=obj.color2,
+                                              linewidth=2)
+        
+        for x in [self.helipad_x1, self.helipad_x2]:
+            flagy1 = self.helipad_y
+            flagy2 = flagy1 + 50 / SCALE
+            self.viewer.draw_polyline([(x, flagy1), (x, flagy2)],
+                                      color=(1, 1, 1))
+            self.viewer.draw_polygon([(x, flagy2), (x, flagy2 - 10 / SCALE),
+                                      (x + 25 / SCALE, flagy2 - 5 / SCALE)],
+                                     color=(0.8, 0.8, 0))
+        
+        return self.viewer.render(return_rgb_array=mode == 'rgb_array')
 
 
 gym.envs.register(
