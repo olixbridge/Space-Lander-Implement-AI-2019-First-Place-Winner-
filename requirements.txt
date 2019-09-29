@@ -1,4 +1,5 @@
-mpi4py
 gym
-stable-baselines
 box2d-py
+opencv-pythonr
+ray
+lz4

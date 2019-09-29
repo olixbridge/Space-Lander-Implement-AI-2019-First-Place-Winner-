@@ -246,26 +246,26 @@ class SpaceXLander(LunarLander):
 
         self.world.Step(1.0/FPS, 6*30, 2*30)
 
-        #Wind
-        #np.random.seed(a=None, version=2)
-        self.lander.ApplyForceToCenter((np.random.randint(-50,50), 0), True)
-        
-
-        #Air resistance
-        p = 1.225 #kg/m^3
-        A = 1 #cross sectional area
-        Cd = 0.05 #drag coeff
-        v_squared = (self.lander.linearVelocity.x ** 2 + self.lander.linearVelocity.y **2)
-        drag_force = 0.5 * p * A * Cd * v_squared
-
-        norm = self.lander.linearVelocity.length
-        vel_x = self.lander.linearVelocity.x
-        vel_y = self.lander.linearVelocity.y
-
-        vel_x = vel_x * -drag_force / norm
-        vel_y = vel_y * -drag_force / norm
-
-        self.lander.ApplyForceToCenter((vel_x, vel_y), True)
+        # #Wind
+        # #np.random.seed(a=None, version=2)
+        # self.lander.ApplyForceToCenter((np.random.randint(-50,50), 0), True)
+        #
+        #
+        # #Air resistance
+        # p = 1.225 #kg/m^3
+        # A = 1 #cross sectional area
+        # Cd = 0.05 #drag coeff
+        # v_squared = (self.lander.linearVelocity.x ** 2 + self.lander.linearVelocity.y **2)
+        # drag_force = 0.5 * p * A * Cd * v_squared
+        #
+        # norm = self.lander.linearVelocity.length
+        # vel_x = self.lander.linearVelocity.x
+        # vel_y = self.lander.linearVelocity.y
+        #
+        # vel_x = vel_x * -drag_force / norm
+        # vel_y = vel_y * -drag_force / norm
+        #
+        # self.lander.ApplyForceToCenter((vel_x, vel_y), True)
 
         pos = self.lander.position
         vel = self.lander.linearVelocity

@@ -1,7 +1,4 @@
-import os
-
 from stable_baselines import DQN
-from tqdm import tqdm
 
 from space_lander.envs.spacex_lander import *
 
@@ -21,8 +18,9 @@ model = DQN(policy='MlpPolicy',
 # Train the agent
 obs = env.reset()
 
+
 def eval_and_show(*args, **kwargs):
-    if args[0]['t'] % 1000 == 0:
+    if args[0]['t'] % 10000 == 0:
         print('Evaluating', args[0]['t'])
         done = False
         while not done:
@@ -30,6 +28,7 @@ def eval_and_show(*args, **kwargs):
             obs, reward, done, info = env.step(action)
             env.render()
         # env.close()
+
 
 # Train the agent
 model.learn(total_timesteps=1000000,
