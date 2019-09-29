@@ -1,6 +1,8 @@
-from tqdm import tqdm
+import os
+
 from stable_baselines import DQN
-from space_lander.envs.lunar_lander import *
+from tqdm import tqdm
+
 from space_lander.envs.spacex_lander import *
 
 # Create environment
@@ -17,14 +19,25 @@ model = DQN(policy='MlpPolicy',
             tensorboard_log=f"./{env_name}")
 
 # Train the agent
-model.learn(total_timesteps=int(2e2), log_interval=10)
+obs = env.reset()
+
+def eval_and_show(*args, **kwargs):
+    if args[0]['t'] % 1000 == 0:
+        print('Evaluating', args[0]['t'])
+        done = False
+        while not done:
+            action, _states = model.predict(args[0]['obs'])
+            obs, reward, done, info = env.step(action)
+            env.render()
+        # env.close()
+
+# Train the agent
+model.learn(total_timesteps=1000000,
+            callback=eval_and_show,
+            log_interval=2)
 
 # Save the agent
-model.save(env_name)
+filename = f'{env_name}'
+model.save(filename)
 
-# Enjoy trained agent
-obs = env.reset()
-for i in tqdm(range(1000)):
-    action, _states = model.predict(obs)
-    obs, rewards, dones, info = env.step(action)
-    env.render()
+# model.load(load_path=f'{filename}.pkl')  # Load the agent

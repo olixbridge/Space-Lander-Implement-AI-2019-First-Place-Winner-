@@ -295,7 +295,7 @@ class SpaceXLander(LunarLander):
         reward -= s_power*0.03
 
         done = False
-        if self.game_over or abs(state[0]) >= 1.0:
+        if self.game_over or abs(state[0]) >= 1.0 or state[1] <= 0:
             done   = True
             reward = -100
         if not self.lander.awake:
